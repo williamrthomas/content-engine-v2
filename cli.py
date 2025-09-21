@@ -72,7 +72,8 @@ def show_help():
         "  [cyan]python cli.py status <job-id>[/cyan]\n\n"
         "[bold green]🔧 System:[/bold green]\n"
         "  [cyan]python cli.py setup[/cyan]\n"
-        "  [cyan]python cli.py templates[/cyan]\n\n"
+        "  [cyan]python cli.py templates[/cyan]\n"
+        "  [cyan]python cli.py llm-test[/cyan]\n\n"
         "[bold yellow]💡 Tips:[/bold yellow]\n"
         "• Be specific in your requests for better results\n"
         "• Use --dry-run to preview before creating\n"
@@ -106,13 +107,23 @@ async def create_job(
         )
         
         if not dry_run:
+            # Show LLM intelligence indicator
+            if not template:
+                console.print(f"[dim]🧠 Using LLM intelligence for template selection...[/dim]")
+            
             job_response = await engine.create_job(job_request)
             
             console.print(f"\n[green]✓ Job created successfully![/green]")
             console.print(f"Job ID: [bold cyan]{job_response.job.id}[/bold cyan]")
             console.print(f"Job Name: [bold]{job_response.job.name}[/bold]")
             console.print(f"Display Name: [bold]{job_response.job.display_name}[/bold]")
-            console.print(f"Template: [bold green]{job_response.job.template_name or 'Auto-selected'}[/bold green]")
+            
+            # Show template selection method
+            if template:
+                console.print(f"Template: [bold green]{job_response.job.template_name}[/bold green] [dim](specified)[/dim]")
+            else:
+                console.print(f"Template: [bold green]{job_response.job.template_name}[/bold green] [dim]🧠 (LLM selected)[/dim]")
+            
             console.print(f"Tasks Created: [bold yellow]{len(job_response.tasks)}[/bold yellow]")
             console.print(f"Status: [yellow]{job_response.job.status}[/yellow]")
             
@@ -431,14 +442,85 @@ async def setup_system():
         templates = await template_loader.load_all_templates()
         console.print(f"✓ Loaded {len(templates)} templates")
         
+        # Test LLM connection
+        engine = ContentEngine()
+        llm_status = await engine.test_llm_connection()
+        if llm_status["connected"]:
+            console.print("✓ LLM service connected (Phase 2 features enabled)")
+        else:
+            console.print("[yellow]⚠ LLM service unavailable (using fallback methods)[/yellow]")
+        
         console.print("\n[green]🎉 Setup complete![/green]")
         console.print("\n[bold]Next steps:[/bold]")
         console.print("1. [cyan]python cli.py create \"Your content request\"[/cyan]")
         console.print("2. [cyan]python cli.py list[/cyan] - to see your jobs")
-        console.print("3. [cyan]python cli.py help[/cyan] - for more examples")
+        console.print("3. [cyan]python cli.py llm-test[/cyan] - test LLM integration")
+        console.print("4. [cyan]python cli.py help[/cyan] - for more examples")
         
     except Exception as e:
         console.print(f"[red]Setup failed: {e}[/red]")
+        raise typer.Exit(1)
+    finally:
+        await close_database()
+
+
+@app.command("llm-test")
+@setup_async
+async def test_llm():
+    """🧠 Test LLM integration and show status"""
+    
+    console.print("[blue]🧠 Testing LLM Integration...[/blue]")
+    
+    try:
+        await init_database()
+        engine = ContentEngine()
+        
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task("Testing LLM connection...", total=None)
+            
+            llm_status = await engine.test_llm_connection()
+            
+            progress.update(task, description="LLM test completed!")
+        
+        # Display results
+        if llm_status["connected"]:
+            console.print("\n[green]✅ LLM Service Status: Connected[/green]")
+            console.print(f"Status: {llm_status['status']}")
+            
+            # Show usage stats if available
+            if "usage_stats" in llm_status:
+                stats = llm_status["usage_stats"]
+                console.print(f"\n[blue]Usage Statistics:[/blue]")
+                console.print(f"  Total requests: {stats.get('total_requests', 0)}")
+                console.print(f"  Total tokens: {stats.get('total_tokens', 0)}")
+                console.print(f"  Estimated cost: ${stats.get('estimated_cost', 0.0):.4f}")
+            
+            console.print("\n[green]🎉 Phase 2 features are fully operational![/green]")
+            console.print("• Intelligent template selection")
+            console.print("• Smart job naming")
+            console.print("• Context-aware processing")
+            
+        else:
+            console.print("\n[yellow]⚠️ LLM Service Status: Unavailable[/yellow]")
+            if "error" in llm_status:
+                console.print(f"Error: {llm_status['error']}")
+            
+            console.print("\n[blue]Fallback Mode Active:[/blue]")
+            console.print("• Keyword-based template selection")
+            console.print("• Simple job naming")
+            console.print("• Basic processing (Phase 1 features)")
+            
+            console.print("\n[dim]💡 To enable LLM features:[/dim]")
+            console.print("1. Set OPENROUTER_API_KEY in your .env file")
+            console.print("2. Ensure internet connectivity")
+            console.print("3. Run this test again")
+        
+    except Exception as e:
+        console.print(f"[red]LLM test failed: {e}[/red]")
         raise typer.Exit(1)
     finally:
         await close_database()

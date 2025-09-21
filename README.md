@@ -4,7 +4,7 @@
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![PostgreSQL](https://img.shields.io/badge/database-postgresql-blue.svg)](https://postgresql.org/)
-[![Phase 1](https://img.shields.io/badge/status-phase%201%20complete-green.svg)](#development-status)
+[![Phase 2](https://img.shields.io/badge/status-phase%202%20complete-green.svg)](#development-status)
 
 ## 🎯 Overview
 
@@ -60,6 +60,7 @@ python cli.py run <job-id>            # Execute job tasks
 
 # System commands
 python cli.py templates               # Show available templates
+python cli.py llm-test                # Test LLM integration
 python cli.py help                    # Detailed usage guide
 ```
 
@@ -142,12 +143,14 @@ docker run --name content-engine-db \
 - [x] Full job lifecycle management
 - [x] Comprehensive documentation and setup
 
-### 🔄 Phase 2: LLM Intelligence (NEXT)
-- [ ] OpenRouter API integration
-- [ ] Intelligent template selection based on content analysis
-- [ ] Smart job naming with SEO optimization
-- [ ] Context-aware agent selection
-- [ ] Cost tracking and usage monitoring
+### ✅ Phase 2: LLM Intelligence (COMPLETE)
+- [x] OpenRouter API integration with async support
+- [x] Intelligent template selection based on content analysis
+- [x] Smart job naming with SEO optimization
+- [x] Context-aware agent selection framework
+- [x] Cost tracking and usage monitoring
+- [x] Graceful fallback when LLM unavailable
+- [x] CLI integration with LLM status indicators
 
 ### 🚧 Phase 3: Agent Ecosystem (PLANNED)
 - [ ] Real agent implementations for each category
@@ -164,22 +167,31 @@ docker run --name content-engine-db \
 ## 📊 Example Workflow
 
 ```bash
-# 1. Create a job
-$ python cli.py create "Write a comprehensive guide about sustainable energy"
-✓ Job created: 139c7ad8-ac11-492d-9e40-c76835e6ec09
-✓ Template: blog-post (auto-selected)
-✓ Tasks: 14 created
+# 1. Test LLM integration
+$ python cli.py llm-test
+🧠 Testing LLM Integration...
+✅ LLM Service Status: Connected
+🎉 Phase 2 features are fully operational!
 
-# 2. Check status
-$ python cli.py status 139c7ad8-ac11-492d-9e40-c76835e6ec09
+# 2. Create a job (LLM will auto-select template and generate smart names)
+$ python cli.py create "Write a comprehensive guide about sustainable energy"
+🧠 Using LLM intelligence for template selection...
+✓ Job created successfully!
+Job ID: 65eff2df-312e-46df-9413-d095e934a9ed
+Template: blog-post 🧠 (LLM selected)
+Display Name: Comprehensive Guide: Sustainable Energy Solutions for Homeowners
+Tasks Created: 14
+
+# 3. Check status
+$ python cli.py status 65eff2df-312e-46df-9413-d095e934a9ed
 ┌─ Job Details ─┐
-│ Name: Write a comprehensive guide about sustainable energy
+│ Name: sustainable-energy-solutions-guide-for-homeowners
 │ Status: pending
 │ Tasks: 14 (7 script, 3 image, 2 audio, 2 video)
 └───────────────┘
 
-# 3. Execute job
-$ python cli.py run 139c7ad8-ac11-492d-9e40-c76835e6ec09
+# 4. Execute job
+$ python cli.py run 65eff2df-312e-46df-9413-d095e934a9ed
 ✓ Job processing completed successfully! 🎉
 Final status: completed
 Tasks completed: 14

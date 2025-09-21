@@ -18,22 +18,16 @@ class Settings(BaseSettings):
         description="PostgreSQL connection URL"
     )
     
-    # LLM Configuration
-    openrouter_api_key: str = Field(
-        default="",
-        env="OPENROUTER_API_KEY", 
-        description="OpenRouter API key for LLM services"
-    )
-    default_model: str = Field(
-        default="openai/gpt-3.5-turbo",
-        env="DEFAULT_MODEL",
-        description="Default LLM model for operations"
-    )
-    fallback_model: str = Field(
-        default="anthropic/claude-3-haiku",
-        env="FALLBACK_MODEL", 
-        description="Fallback LLM model if default fails"
-    )
+    # OpenRouter API Configuration
+    openrouter_api_key: str = Field(default="", env="OPENROUTER_API_KEY")
+    default_model: str = Field(default="openai/gpt-3.5-turbo", env="DEFAULT_MODEL")
+    fallback_model: str = Field(default="anthropic/claude-3-haiku", env="FALLBACK_MODEL")
+    
+    # LLM Service Configuration
+    llm_temperature: float = Field(default=0.7, env="LLM_TEMPERATURE")
+    llm_max_tokens: int = Field(default=1000, env="LLM_MAX_TOKENS")
+    llm_timeout: int = Field(default=60, env="LLM_TIMEOUT")
+    enable_llm_fallback: bool = Field(default=True, env="ENABLE_LLM_FALLBACK")
     
     # Storage Configuration
     assets_dir: Path = Field(
