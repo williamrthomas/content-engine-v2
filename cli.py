@@ -1,5 +1,27 @@
 #!/usr/bin/env python3
-"""Content Engine V2 - Clean CLI Interface"""
+"""
+Content Engine V2 - Professional Content Creation CLI
+
+A comprehensive command-line interface for the Content Engine V2 system,
+providing LLM-powered content creation with real asset generation capabilities.
+
+Features:
+- LLM-intelligent template selection and job naming
+- Real image generation via Freepik Mystic API
+- Template-driven agent selection for deterministic workflows
+- Complete job lifecycle management with rich progress indicators
+- Built-in testing and validation commands
+
+Usage:
+    python cli.py setup                    # Initialize system
+    python cli.py create "Your request"    # Create content job
+    python cli.py run <job-id>             # Execute job tasks
+    python cli.py status <job-id>          # Check job status
+    python cli.py help                     # Show usage guide
+
+Author: Content Engine V2 Team
+Version: Phase 3+ Complete
+"""
 
 import asyncio
 import functools
@@ -60,96 +82,41 @@ def show_help():
     """📚 Show detailed usage examples and tips"""
     
     console.print(Panel.fit(
-        "[bold blue]Content Engine V2 - Quick Start Guide[/bold blue]\n\n"
-        "[bold green]🚀 Create Content:[/bold green]\n"
-        "  [cyan]python cli.py create \"Write a blog post about AI trends\"[/cyan]\n"
-        "  [cyan]python cli.py create \"Make a YouTube tutorial on Docker\" --template youtube-tutorial[/cyan]\n\n"
-        "[bold green]⚡ Run Jobs:[/bold green]\n"
-        "  [cyan]python cli.py run <job-id>[/cyan]\n"
-        "  [cyan]python cli.py run <job-id> --monitor[/cyan]\n\n"
-        "[bold green]📋 Manage Jobs:[/bold green]\n"
-        "  [cyan]python cli.py list[/cyan]\n"
-        "  [cyan]python cli.py status <job-id>[/cyan]\n\n"
-        "[bold green]🔧 System:[/bold green]\n"
-        "  [cyan]python cli.py setup[/cyan]\n"
-        "  [cyan]python cli.py templates[/cyan]\n"
-        "  [cyan]python cli.py llm-test[/cyan]\n\n"
-        "[bold yellow]💡 Tips:[/bold yellow]\n"
-        "• Be specific in your requests for better results\n"
-        "• Use --dry-run to preview before creating\n"
-        "• Monitor long jobs with --monitor flag",
+        "[bold cyan]🚀 Content Engine V2 - Usage Guide[/bold cyan]\n\n"
+        "[bold yellow]📋 QUICK START:[/bold yellow]\n"
+        "  [cyan]python cli.py setup[/cyan]                           # Initialize system\n"
+        "  [cyan]python cli.py templates[/cyan]                       # See available templates\n"
+        "  [cyan]python cli.py create <template> \"Your context\"[/cyan]  # Create job\n"
+        "  [cyan]python cli.py run <job-id>[/cyan]                    # Execute job\n\n"
+        "[bold yellow]🎯 DETERMINISTIC WORKFLOWS:[/bold yellow]\n"
+        "  Blog Posts:\n"
+        "    [cyan]python cli.py create blog-post \"Sustainable energy trends for 2024\"[/cyan]\n"
+        "  \n"
+        "  YouTube Content:\n"
+        "    [cyan]python cli.py create youtube-tutorial \"Docker containerization basics\"[/cyan]\n"
+        "  \n"
+        "  Daily Lists (with real images):\n"
+        "    [cyan]python cli.py create top-x-daily-list \"Top 5 AI breakthroughs today\"[/cyan]\n\n"
+        "[bold yellow]🔧 SYSTEM TESTING:[/bold yellow]\n"
+        "  [cyan]python cli.py llm-test[/cyan]        # Test LLM integration\n"
+        "  [cyan]python cli.py freepik-test[/cyan]    # Test image generation\n"
+        "  [cyan]python cli.py templates[/cyan]       # Show available templates\n\n"
+        "[bold yellow]📊 JOB MANAGEMENT:[/bold yellow]\n"
+        "  [cyan]python cli.py list[/cyan]            # Show recent jobs\n"
+        "  [cyan]python cli.py status <id>[/cyan]     # Check job details\n"
+        "  [cyan]python cli.py run <id>[/cyan]        # Execute job tasks\n\n"
+        "[bold yellow]💡 Template-driven workflow ensures deterministic agent selection![/bold yellow]",
         border_style="blue"
     ))
 
 
 @app.command("create")
-@setup_async
-async def create_job(
-    request: str = typer.Argument(..., help="📝 What content do you want to create? (e.g., 'Write a blog post about AI')"),
-    template: Optional[str] = typer.Option(None, "--template", "-t", help="🎯 Force specific template (blog-post, youtube-tutorial)"),
-    dry_run: bool = typer.Option(False, "--dry-run", help="👀 Preview what would be created without saving")
+def create(
+    template: str = typer.Argument(..., help="Template name (use 'templates' command to see options)"),
+    context: str = typer.Argument(..., help="Your specific context/topic for this template")
 ):
-    """🚀 Create a new content generation job"""
-    
-    console.print(f"\n[bold blue]Creating content job...[/bold blue]")
-    console.print(f"Request: [italic]{request}[/italic]")
-    
-    try:
-        await init_database()
-        
-        if dry_run:
-            console.print("\n[yellow]DRY RUN MODE - No changes will be saved[/yellow]")
-        
-        engine = ContentEngine()
-        job_request = JobCreateRequest(
-            user_request=request,
-            template_name=template
-        )
-        
-        if not dry_run:
-            # Show LLM intelligence indicator
-            if not template:
-                console.print(f"[dim]🧠 Using LLM intelligence for template selection...[/dim]")
-            
-            job_response = await engine.create_job(job_request)
-            
-            console.print(f"\n[green]✓ Job created successfully![/green]")
-            console.print(f"Job ID: [bold cyan]{job_response.job.id}[/bold cyan]")
-            console.print(f"Job Name: [bold]{job_response.job.name}[/bold]")
-            console.print(f"Display Name: [bold]{job_response.job.display_name}[/bold]")
-            
-            # Show template selection method
-            if template:
-                console.print(f"Template: [bold green]{job_response.job.template_name}[/bold green] [dim](specified)[/dim]")
-            else:
-                console.print(f"Template: [bold green]{job_response.job.template_name}[/bold green] [dim]🧠 (LLM selected)[/dim]")
-            
-            console.print(f"Tasks Created: [bold yellow]{len(job_response.tasks)}[/bold yellow]")
-            console.print(f"Status: [yellow]{job_response.job.status}[/yellow]")
-            
-            if job_response.tasks:
-                console.print(f"\n[blue]Tasks breakdown:[/blue]")
-                task_counts = {}
-                for task in job_response.tasks:
-                    if task.category not in task_counts:
-                        task_counts[task.category] = 0
-                    task_counts[task.category] += 1
-                
-                for category, count in task_counts.items():
-                    console.print(f"  {category}: {count} tasks")
-            
-            console.print(f"\n[dim]💡 Next: python cli.py run {job_response.job.id}[/dim]")
-        else:
-            await template_loader.load_all_templates()
-            console.print(f"\n[blue]Would create job with:[/blue]")
-            console.print(f"Request: [bold]{request}[/bold]")
-            console.print(f"Template: [bold]{template or 'Auto-selected'}[/bold]")
-        
-    except Exception as e:
-        console.print(f"[red]Error creating job: {e}[/red]")
-        raise typer.Exit(1)
-    finally:
-        await close_database()
+    """🚀 Create a new content job with deterministic template selection"""
+    asyncio.run(_create_job_deterministic(template, context))
 
 
 @app.command("run")
@@ -464,15 +431,170 @@ async def setup_system():
         await close_database()
 
 
-@app.command("llm-test")
-@setup_async
-async def test_llm():
-    """🧠 Test LLM integration and show status"""
+@app.command()
+def llm_test():
+    """Test LLM service connectivity and capabilities"""
+    asyncio.run(_llm_test())
+
+
+@app.command()
+def freepik_test():
+    """Test Freepik Mystic agent integration"""
+    asyncio.run(_freepik_test())
+
+
+async def _create_job_deterministic(template: str, context: str):
+    """Create a job with explicit template selection and user context"""
+    from src.engine.content_engine import ContentEngine
+    from src.core.models import JobCreateRequest
+    from src.templates.loader import template_loader
     
-    console.print("[blue]🧠 Testing LLM Integration...[/blue]")
+    console.print(f"\n[bold blue]Creating content job...[/bold blue]")
+    console.print(f"Template: [bold green]{template}[/bold green]")
+    console.print(f"Context: [italic]{context}[/italic]")
     
     try:
         await init_database()
+        
+        # Load templates to validate selection
+        await template_loader.load_all_templates()
+        available_templates = template_loader.get_template_names()
+        
+        if template not in available_templates:
+            console.print(f"\n[red]❌ Template '{template}' not found[/red]")
+            console.print(f"[yellow]Available templates:[/yellow]")
+            for tmpl in available_templates:
+                console.print(f"  • {tmpl}")
+            console.print(f"\n[dim]💡 Use: python cli.py templates[/dim]")
+            raise typer.Exit(1)
+        
+        # Create job with explicit template and context
+        engine = ContentEngine()
+        job_request = JobCreateRequest(
+            user_request=context,
+            template_name=template  # Force specific template
+        )
+        
+        job_response = await engine.create_job(job_request)
+        
+        console.print(f"\n[green]✓ Job created successfully![/green]")
+        console.print(f"Job ID: [bold cyan]{job_response.job.id}[/bold cyan]")
+        console.print(f"Job Name: [bold]{job_response.job.name}[/bold]")
+        console.print(f"Display Name: [bold]{job_response.job.display_name}[/bold]")
+        console.print(f"Template: [bold green]{job_response.job.template_name}[/bold green] [dim](deterministic)[/dim]")
+        console.print(f"Tasks Created: [bold yellow]{len(job_response.tasks)}[/bold yellow]")
+        
+        # Show task breakdown with agent assignments
+        if job_response.tasks:
+            console.print(f"\n[blue]Tasks breakdown:[/blue]")
+            task_counts = {}
+            agent_assignments = {}
+            
+            for task in job_response.tasks:
+                # Count by category
+                if task.category not in task_counts:
+                    task_counts[task.category] = 0
+                task_counts[task.category] += 1
+                
+                # Track agent assignments
+                if task.preferred_agent:
+                    if task.preferred_agent not in agent_assignments:
+                        agent_assignments[task.preferred_agent] = 0
+                    agent_assignments[task.preferred_agent] += 1
+            
+            for category, count in task_counts.items():
+                console.print(f"  {category}: {count} tasks")
+            
+            if agent_assignments:
+                console.print(f"\n[blue]Agent assignments:[/blue]")
+                for agent, count in agent_assignments.items():
+                    console.print(f"  {agent}: {count} tasks")
+        
+        console.print(f"Status: [yellow]{job_response.job.status}[/yellow]")
+        console.print(f"\n[dim]💡 Next: python cli.py run {job_response.job.id}[/dim]")
+        
+    except Exception as e:
+        console.print(f"[red]Error creating job: {e}[/red]")
+        raise typer.Exit(1)
+    finally:
+        await close_database()
+
+
+async def _freepik_test():
+    """Test Freepik agent functionality"""
+    from src.agents.registry import agent_registry
+    from src.core.models import Task, TaskCategory, TaskStatus
+    from uuid import uuid4
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+    
+    console.print("🎨 [bold blue]Testing Freepik Integration...[/bold blue]")
+    
+    try:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console
+        ) as progress:
+            task = progress.add_task("Testing Freepik agent...", total=None)
+            
+            # Test agent availability
+            freepik_agent = agent_registry.get_agent('freepik_mystic')
+            progress.update(task, description="Freepik agent loaded!")
+        
+        # Display results
+        if freepik_agent:
+            console.print(f"\n[green]✅ Freepik Agent: {freepik_agent.name}[/green]")
+            console.print(f"API Key Configured: {hasattr(freepik_agent, 'api_key') and freepik_agent.api_key is not None}")
+            
+            # Get capabilities
+            capabilities = await freepik_agent.get_capabilities()
+            console.print(f"Specializations: {len(capabilities['specializations'])}")
+            
+            # Test with sample task
+            thumbnail_task = Task(
+                id=uuid4(),
+                job_id=uuid4(),
+                task_name='design_thumbnail',
+                category=TaskCategory.IMAGE,
+                sequence_order=1,
+                status=TaskStatus.PENDING,
+                parameters={
+                    'inputs': {'user_request': 'Test YouTube thumbnail'},
+                    'requirements': {'style': 'bold', 'ai_visual_elements': True}
+                }
+            )
+            
+            result = await freepik_agent.execute(thumbnail_task)
+            console.print(f"Test Execution: {result.status}")
+            console.print(f"Quality Score: {result.metadata.get('quality_score', 'N/A')}")
+            
+            if result.outputs.get('api_available', True):
+                console.print("\n[green]🎉 Freepik API integration ready![/green]")
+                console.print("• Real image generation enabled")
+                console.print("• Professional quality output")
+                console.print("• Multi-format support")
+            else:
+                console.print("\n[yellow]📋 Specification mode active[/yellow]")
+                console.print("• Detailed prompts generated")
+                console.print("• API parameters optimized")
+                console.print("• Ready for manual generation")
+                console.print("\n[blue]💡 To enable image generation:[/blue]")
+                console.print("export FREEPIK_API_KEY=your-api-key-here")
+        else:
+            console.print("\n[red]❌ Freepik agent not found[/red]")
+            
+    except Exception as e:
+        console.print(f"\n[red]❌ Freepik test failed: {e}[/red]")
+
+
+async def _llm_test():
+    """Test LLM service functionality"""
+    from src.engine.content_engine import ContentEngine
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+    
+    console.print("🧠 [bold blue]Testing LLM Integration...[/bold blue]")
+    
+    try:
         engine = ContentEngine()
         
         with Progress(

@@ -9,6 +9,7 @@ from uuid import UUID
 from ..core.database import db_manager
 from ..core.models import Task, TaskStatus, TaskCategory, TaskResult
 from ..agents.base_agent import BaseAgent
+from ..agents.registry import agent_registry
 
 logger = logging.getLogger(__name__)
 
@@ -81,10 +82,15 @@ class TaskRunner:
                 started_at=datetime.utcnow()
             )
             
-            # For Phase 1, we'll use placeholder execution
-            # Phase 2 will add LLM agent selection
-            # Phase 3 will add real agent implementations
-            result = await self._execute_task_placeholder(task)
+            # Phase 3: Use agent registry to find best agent for task
+            agent = await agent_registry.find_best_agent(task)
+            
+            if agent:
+                logger.info(f"Using agent {agent.name} for task {task.task_name}")
+                result = await agent.execute(task)
+            else:
+                logger.warning(f"No suitable agent found for task {task.task_name}, using placeholder")
+                result = await self._execute_task_placeholder(task)
             
             if result.status == TaskStatus.COMPLETED:
                 # Update task with success

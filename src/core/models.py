@@ -55,18 +55,20 @@ class Job(BaseModel):
 
 
 class Task(BaseModel):
-    """Task model matching the database schema"""
-    id: UUID = Field(default_factory=uuid4)
-    job_id: UUID = Field(..., description="Reference to parent job")
-    task_name: str = Field(..., max_length=100, description="Free-form task description")
+    """Model for individual tasks within a job"""
+    id: UUID = Field(default_factory=uuid4, description="Unique task identifier")
+    job_id: UUID = Field(..., description="Parent job identifier")
+    task_name: str = Field(..., description="Task name")
     category: TaskCategory = Field(..., description="Task category")
-    sequence_order: int = Field(..., description="Order within category")
-    status: TaskStatus = Field(default=TaskStatus.PENDING)
-    assigned_agent_id: Optional[UUID] = Field(None, description="Assigned agent ID")
-    parameters: Dict[str, Any] = Field(default_factory=dict, description="Task parameters as JSONB")
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    error_message: Optional[str] = None
+    sequence_order: int = Field(..., description="Execution order within category")
+    status: TaskStatus = Field(default=TaskStatus.PENDING, description="Current task status")
+    assigned_agent_id: Optional[UUID] = Field(default=None, description="Assigned agent ID")
+    preferred_agent: Optional[str] = Field(default=None, description="Preferred agent instance name")
+    parameters: Dict[str, Any] = Field(default_factory=dict, description="Task parameters")
+    created_at: datetime = Field(default_factory=datetime.utcnow, description="Creation timestamp")
+    started_at: Optional[datetime] = Field(default=None, description="Start timestamp")
+    completed_at: Optional[datetime] = Field(default=None, description="Completion timestamp")
+    error_message: Optional[str] = Field(default=None, description="Error message if failed")
     
     class Config:
         use_enum_values = True
@@ -145,6 +147,7 @@ class TemplateTask(BaseModel):
     category: TaskCategory = Field(..., description="Task category")
     sequence_order: int = Field(..., description="Order within category")
     parameters: Dict[str, Any] = Field(default_factory=dict, description="Default parameters")
+    preferred_agent: Optional[str] = Field(default=None, description="Preferred agent instance name")
 
 
 class Template(BaseModel):

@@ -65,6 +65,25 @@ class Settings(BaseSettings):
         description="Enable progress bars in CLI"
     )
     
+    # Image Generation APIs
+    freepik_api_key: Optional[str] = Field(
+        default=None,
+        env="FREEPIK_API_KEY",
+        description="Freepik API key for image generation"
+    )
+    freepik_webhook_url: Optional[str] = Field(
+        default=None,
+        env="FREEPIK_WEBHOOK_URL",
+        description="Webhook URL for Freepik async notifications"
+    )
+    
+    # Audio Generation APIs
+    eleven_labs_api_key: Optional[str] = Field(
+        default=None,
+        env="ELEVEN_LABS_API_KEY",
+        description="ElevenLabs API key for voice generation"
+    )
+    
     # Development
     debug: bool = Field(
         default=False,

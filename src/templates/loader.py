@@ -129,8 +129,15 @@ class TemplateLoader:
                     continue
                 
                 # Task description (next line after task name)
-                if current_task and line.startswith('   - ') and not current_task.description:
+                if current_task and line.startswith('   - ') and not current_task.description and not line.startswith('   - Agent:') and not line.startswith('   - Parameters:'):
                     current_task.description = line[5:].strip()
+                    i += 1
+                    continue
+                
+                # Task agent specification (e.g., "   - Agent: freepik_mystic")
+                if current_task and line.startswith('   - Agent:'):
+                    agent_name = line[11:].strip()
+                    current_task.preferred_agent = agent_name
                     i += 1
                     continue
                 
@@ -195,8 +202,12 @@ class TemplateLoader:
         """Get a loaded template by name"""
         return self.templates.get(template_name)
     
-    def list_templates(self) -> List[str]:
-        """List all loaded template names"""
+    def get_templates(self) -> List[Template]:
+        """Get all loaded templates"""
+        return list(self.templates.values())
+    
+    def get_template_names(self) -> List[str]:
+        """Get list of available template names"""
         return list(self.templates.keys())
     
     def get_templates_by_category(self, category: str) -> List[Template]:

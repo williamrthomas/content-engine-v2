@@ -1,4 +1,26 @@
-"""Main Content Engine orchestration class"""
+"""Main Content Engine V2 - Professional Content Creation Engine
+
+The core orchestration engine that transforms user requests into professional-quality
+content across all media types. Combines LLM intelligence with specialized agents
+and real API integrations for complete content generation workflows.
+
+Key Features:
+- LLM-powered template selection and job naming
+- Template-driven agent assignment for deterministic workflows  
+- Real content generation via API integrations (Freepik, etc.)
+- Quality assurance with validation and scoring systems
+- Production-scale processing with comprehensive error handling
+
+Architecture:
+- ContentEngine: Main orchestration class
+- LLM Integration: OpenRouter API for intelligent decision making
+- Agent Registry: Manages specialized content generation agents
+- Task Runner: Executes sequential content creation workflows
+- Database: PostgreSQL with comprehensive job and task tracking
+
+Author: Content Engine V2 Team
+Version: Phase 3+ Complete - Real Content Generation
+"""
 
 import logging
 from datetime import datetime
@@ -232,7 +254,8 @@ class ContentEngine:
                 category=template_task.category,
                 sequence_order=template_task.sequence_order,
                 status=TaskStatus.PENDING,
-                parameters=task_parameters
+                parameters=task_parameters,
+                preferred_agent=template_task.preferred_agent
             )
             
             # Save task to database

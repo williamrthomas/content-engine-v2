@@ -93,6 +93,7 @@ class DatabaseManager:
             sequence_order INTEGER NOT NULL,
             status VARCHAR(20) DEFAULT 'pending',
             assigned_agent_id UUID,
+            preferred_agent VARCHAR(100),
             parameters JSONB NOT NULL DEFAULT '{}',
             started_at TIMESTAMP,
             completed_at TIMESTAMP,
@@ -183,8 +184,8 @@ class DatabaseManager:
         """Create a new task in the database"""
         query = """
         INSERT INTO tasks (id, job_id, task_name, category, sequence_order, status, 
-                          assigned_agent_id, parameters, started_at, completed_at, error_message)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                          assigned_agent_id, preferred_agent, parameters, started_at, completed_at, error_message)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING *
         """
         
@@ -192,7 +193,7 @@ class DatabaseManager:
             row = await conn.fetchrow(
                 query,
                 task.id, task.job_id, task.task_name, task.category,
-                task.sequence_order, task.status, task.assigned_agent_id,
+                task.sequence_order, task.status, task.assigned_agent_id, task.preferred_agent,
                 json.dumps(task.parameters), task.started_at, task.completed_at, task.error_message
             )
             return self._row_to_task(row)

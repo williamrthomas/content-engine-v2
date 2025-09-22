@@ -46,14 +46,17 @@ A specialized template for creating daily "Top X" list videos that source trendi
 
 8. **design_thumbnail**
    - Create eye-catching YouTube thumbnail with list number and AI theme
+   - Agent: freepik_mystic
    - Parameters: {size: "1280x720", style: "bold", include_number: true, ai_visual_elements: true, high_contrast: true}
 
 9. **create_list_graphics**
    - Generate visual cards for each top list item
+   - Agent: freepik_mystic
    - Parameters: {card_count: 7, consistent_design: true, include_logos: true, ranking_numbers: true, brand_colors: true}
 
 10. **design_social_assets**
     - Create shareable graphics for social media promotion
+    - Agent: freepik_mystic
     - Parameters: {platforms: ["twitter", "linkedin", "instagram"], teaser_style: true, include_top_3_preview: true}
 
 ### Audio Tasks
