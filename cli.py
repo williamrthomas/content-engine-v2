@@ -104,7 +104,8 @@ def show_help():
         "[bold yellow]📊 JOB MANAGEMENT:[/bold yellow]\n"
         "  [cyan]python cli.py list[/cyan]            # Show recent jobs\n"
         "  [cyan]python cli.py status <id>[/cyan]     # Check job details\n"
-        "  [cyan]python cli.py run <id>[/cyan]        # Execute job tasks\n\n"
+        "  [cyan]python cli.py run <id>[/cyan]        # Execute job tasks\n"
+        "  [cyan]python cli.py review <id>[/cyan]     # Review job outputs\n\n"
         "[bold yellow]💡 Template-driven workflow ensures deterministic agent selection![/bold yellow]",
         border_style="blue"
     ))
@@ -122,7 +123,7 @@ def create(
 @app.command("run")
 @setup_async
 async def run_job(
-    job_id: str = typer.Argument(..., help="🆔 Job ID to execute (get from 'create' or 'list' command)"),
+    job_id: str = typer.Argument(..., help="🆔 Job number (1, 2, 3...) or full UUID"),
     monitor: bool = typer.Option(False, "--monitor", "-m", help="📊 Watch progress in real-time")
 ):
     """⚡ Execute a job by running all its tasks sequentially"""
@@ -131,10 +132,11 @@ async def run_job(
         await init_database()
         
         try:
-            job_uuid = UUID(job_id)
-        except ValueError:
-            console.print(f"[red]Invalid job ID format: {job_id}[/red]")
-            console.print("[dim]💡 Get job ID from 'python cli.py list'[/dim]")
+            resolved_job_id = await _resolve_job_id(job_id)
+            job_uuid = UUID(resolved_job_id)
+        except ValueError as e:
+            console.print(f"[red]{e}[/red]")
+            console.print("[dim]💡 Use 'python cli.py list' to see job numbers[/dim]")
             raise typer.Exit(1)
         
         engine = ContentEngine()
@@ -206,7 +208,7 @@ async def run_job(
 @app.command("status")
 @setup_async
 async def job_status(
-    job_id: str = typer.Argument(..., help="🆔 Job ID to check (get from 'list' command)")
+    job_id: str = typer.Argument(..., help="🆔 Job number (1, 2, 3...) or full UUID")
 ):
     """📊 Check the detailed status of a specific job"""
     
@@ -214,10 +216,11 @@ async def job_status(
         await init_database()
         
         try:
-            job_uuid = UUID(job_id)
-        except ValueError:
-            console.print(f"[red]Invalid job ID format: {job_id}[/red]")
-            console.print("[dim]💡 Get job ID from 'python cli.py list'[/dim]")
+            resolved_job_id = await _resolve_job_id(job_id)
+            job_uuid = UUID(resolved_job_id)
+        except ValueError as e:
+            console.print(f"[red]{e}[/red]")
+            console.print("[dim]💡 Use 'python cli.py list' to see job numbers[/dim]")
             raise typer.Exit(1)
         
         engine = ContentEngine()
@@ -286,60 +289,61 @@ async def job_status(
 @app.command("list")
 @setup_async
 async def list_jobs(
-    status: Optional[str] = typer.Option(None, "--status", "-s", help="🔍 Filter by status (pending, completed, failed)"),
-    limit: int = typer.Option(10, "--limit", "-l", help="📊 Maximum jobs to show")
+    limit: int = typer.Option(10, "--limit", "-l", help="🔢 Number of jobs to show (default: 10)")
 ):
     """📋 List recent jobs with their status"""
     
     try:
         await init_database()
-        engine = ContentEngine()
         
-        status_filter = None
-        if status:
-            try:
-                status_filter = JobStatus(status.lower())
-            except ValueError:
-                console.print(f"[red]Invalid status: {status}. Use: pending, completed, failed[/red]")
-                raise typer.Exit(1)
-        
-        jobs = await engine.list_jobs(status=status_filter, limit=limit)
+        jobs = await db_manager.get_recent_jobs(limit)
         
         if not jobs:
-            console.print("[yellow]No jobs found[/yellow]")
-            console.print("[dim]💡 Create your first job: python cli.py create \"Your request\"[/dim]")
+            console.print("[yellow]No jobs found. Create your first job with:[/yellow]")
+            console.print("[dim]python cli.py create <template> \"Your context\"[/dim]")
             return
         
-        table = Table(title=f"Recent Jobs ({len(jobs)})", show_header=True)
-        table.add_column("ID", style="dim", width=8)
-        table.add_column("Name", style="white", min_width=30)
-        table.add_column("Template", style="green")
-        table.add_column("Status", style="yellow")
-        table.add_column("Created", style="blue")
+        # Create table with index numbers
+        table = Table(title=f"Recent Jobs ({len(jobs)})", show_lines=False)
+        table.add_column("#", style="bold magenta", justify="center", width=3)
+        table.add_column("Name", style="cyan", max_width=35)
+        table.add_column("Template", style="green", max_width=15)
+        table.add_column("Status", style="yellow", max_width=12)
+        table.add_column("Tasks", justify="center", width=7)
+        table.add_column("Created", style="dim", width=8)
+        table.add_column("ID", style="blue", width=8)
         
-        for job in jobs:
-            status_emoji = {
-                "pending": "⏳",
-                "in_progress": "🔄", 
-                "completed": "✅",
-                "failed": "❌"
-            }.get(job.status, "❓")
+        for i, job in enumerate(jobs, 1):
+            # Get task count
+            tasks = await db_manager.get_tasks_for_job(job.id)
+            completed_tasks = len([t for t in tasks if t.status == TaskStatus.COMPLETED])
+            total_tasks = len(tasks)
             
-            short_id = str(job.id)[:8]
-            display_name = job.display_name or job.name
-            if len(display_name) > 40:
-                display_name = display_name[:37] + "..."
+            # Format status with emoji
+            status_emoji = {
+                JobStatus.PENDING: "⏳",
+                JobStatus.IN_PROGRESS: "🔄", 
+                JobStatus.COMPLETED: "✅",
+                JobStatus.FAILED: "❌"
+            }
+            
+            status_display = f"{status_emoji.get(job.status, '❓')} {job.status}"
             
             table.add_row(
-                short_id,
-                display_name,
-                job.template_name or "None",
-                f"{status_emoji} {job.status}",
-                job.created_at.strftime('%m/%d %H:%M')
+                str(i),
+                job.display_name or job.name,
+                job.template_name or "Unknown",
+                status_display,
+                f"{completed_tasks}/{total_tasks}",
+                job.created_at.strftime("%m/%d %H:%M"),
+                str(job.id)[:8]
             )
         
         console.print(table)
-        console.print(f"\n[dim]💡 Use full job ID for commands: python cli.py status <full-job-id>[/dim]")
+        console.print(f"\n[dim]💡 Quick commands:[/dim]")
+        console.print(f"[dim]   python cli.py status 1      # Check job #1 details[/dim]")
+        console.print(f"[dim]   python cli.py review 2      # Review job #2 outputs[/dim]")
+        console.print(f"[dim]   python cli.py run 3         # Execute job #3[/dim]")
         
     except Exception as e:
         console.print(f"[red]Error listing jobs: {e}[/red]")
@@ -437,10 +441,52 @@ def llm_test():
     asyncio.run(_llm_test())
 
 
-@app.command()
+@app.command("freepik-test")
 def freepik_test():
     """Test Freepik Mystic agent integration"""
     asyncio.run(_freepik_test())
+
+
+@app.command("review")
+def review(
+    job_id: str = typer.Argument(..., help="Job number (1, 2, 3...) or full UUID"),
+    category: Optional[str] = typer.Option(None, "--category", "-c", help="Filter by category (script, image, audio, video)"),
+    export: bool = typer.Option(False, "--export", "-e", help="Export review to markdown file"),
+    open_files: bool = typer.Option(False, "--open", "-o", help="Open asset files in default applications")
+):
+    """📋 Review job outputs and generated content"""
+    asyncio.run(_review_job(job_id, category, export, open_files))
+
+
+async def _resolve_job_id(job_identifier: str) -> str:
+    """Resolve job identifier (number or UUID) to full UUID"""
+    from uuid import UUID
+    
+    # If it's already a valid UUID, return as-is
+    try:
+        UUID(job_identifier)
+        return job_identifier
+    except ValueError:
+        pass
+    
+    # If it's a number, resolve to UUID from recent jobs
+    try:
+        job_number = int(job_identifier)
+        if job_number < 1:
+            raise ValueError("Job number must be positive")
+        
+        # Get recent jobs and find the one at this index
+        jobs = await db_manager.get_recent_jobs(50)  # Get more jobs to ensure we find it
+        if job_number > len(jobs):
+            raise ValueError(f"Job #{job_number} not found. Only {len(jobs)} recent jobs available.")
+        
+        # Return the UUID of the job at this index (1-based)
+        return str(jobs[job_number - 1].id)
+        
+    except ValueError as e:
+        if "invalid literal" in str(e):
+            raise ValueError(f"Invalid job identifier: {job_identifier}. Use job number (1, 2, 3...) or full UUID.")
+        raise e
 
 
 async def _create_job_deterministic(template: str, context: str):
@@ -643,6 +689,145 @@ async def _llm_test():
         
     except Exception as e:
         console.print(f"[red]LLM test failed: {e}[/red]")
+        raise typer.Exit(1)
+    finally:
+        await close_database()
+
+
+async def _review_job(job_id: str, category: Optional[str], export: bool, open_files: bool):
+    """Review job outputs and generated content"""
+    from src.engine.content_engine import ContentEngine
+    from src.core.database import db_manager
+    from uuid import UUID
+    from pathlib import Path
+    import json
+    
+    console.print(f"\n[bold blue]📋 Reviewing Job Outputs[/bold blue]")
+    console.print(f"Job: [cyan]{job_id}[/cyan]")
+    
+    try:
+        await init_database()
+        
+        # Resolve job ID
+        try:
+            resolved_job_id = await _resolve_job_id(job_id)
+            job_uuid = UUID(resolved_job_id)
+        except ValueError as e:
+            console.print(f"[red]{e}[/red]")
+            console.print("[dim]💡 Use 'python cli.py list' to see job numbers[/dim]")
+            raise typer.Exit(1)
+        
+        # Get job details
+        engine = ContentEngine()
+        job_response = await engine.get_job_status(job_uuid)
+        if not job_response:
+            console.print(f"[red]Job not found: {job_id}[/red]")
+            raise typer.Exit(1)
+        
+        job = job_response.job
+        tasks = job_response.tasks
+        
+        # Filter by category if specified
+        if category:
+            tasks = [t for t in tasks if t.category.lower() == category.lower()]
+            if not tasks:
+                console.print(f"[yellow]No tasks found for category: {category}[/yellow]")
+                return
+        
+        # Display job overview
+        console.print(f"\n[bold green]✅ Job: {job.display_name}[/bold green]")
+        console.print(f"Template: [bold]{job.template_name}[/bold]")
+        console.print(f"Status: [bold green]{job.status}[/bold green]")
+        console.print(f"Created: {job.created_at}")
+        if job.completed_at:
+            console.print(f"Completed: {job.completed_at}")
+        
+        # Group tasks by category
+        task_groups = {}
+        for task in tasks:
+            if task.category not in task_groups:
+                task_groups[task.category] = []
+            task_groups[task.category].append(task)
+        
+        # Review outputs by category
+        review_content = []
+        
+        for cat, cat_tasks in task_groups.items():
+            console.print(f"\n[bold yellow]📂 {cat.upper()} TASKS ({len(cat_tasks)})[/bold yellow]")
+            review_content.append(f"\n## {cat.upper()} TASKS ({len(cat_tasks)})\n")
+            
+            for task in sorted(cat_tasks, key=lambda x: x.sequence_order):
+                console.print(f"\n[cyan]🔹 {task.task_name}[/cyan]")
+                console.print(f"   Status: [green]{task.status}[/green]")
+                
+                review_content.append(f"\n### {task.task_name}\n")
+                review_content.append(f"- **Status**: {task.status}\n")
+                
+                # Get task details from database
+                task_details = await db_manager.get_task_by_id(task.id)
+                if task_details and hasattr(task_details, 'parameters'):
+                    params = task_details.parameters
+                    
+                    # Show outputs if available
+                    if 'outputs' in params:
+                        outputs = params['outputs']
+                        
+                        # Display different types of outputs
+                        if 'content' in outputs:
+                            content = outputs['content']
+                            if isinstance(content, str) and len(content) > 200:
+                                console.print(f"   Content: [dim]{content[:200]}...[/dim]")
+                                review_content.append(f"- **Content**: {content[:500]}{'...' if len(content) > 500 else ''}\n")
+                            else:
+                                console.print(f"   Content: [dim]{content}[/dim]")
+                                review_content.append(f"- **Content**: {content}\n")
+                        
+                        if 'specifications' in outputs:
+                            specs = outputs['specifications']
+                            console.print(f"   Specifications: [dim]{len(specs)} items[/dim]")
+                            review_content.append(f"- **Specifications**: {len(specs)} items\n")
+                        
+                        if 'image_url' in outputs:
+                            image_url = outputs['image_url']
+                            console.print(f"   Image: [green]{image_url}[/green]")
+                            review_content.append(f"- **Image**: {image_url}\n")
+                        
+                        # Show quality score if available
+                        if 'quality_score' in outputs:
+                            score = outputs['quality_score']
+                            color = "green" if score > 0.7 else "yellow" if score > 0.5 else "red"
+                            console.print(f"   Quality: [{color}]{score:.2f}[/{color}]")
+                            review_content.append(f"- **Quality Score**: {score:.2f}\n")
+                        
+                        # Show agent used
+                        if 'agent_used' in outputs:
+                            agent = outputs['agent_used']
+                            console.print(f"   Agent: [blue]{agent}[/blue]")
+                            review_content.append(f"- **Agent**: {agent}\n")
+        
+        # Export to markdown if requested
+        if export:
+            export_path = Path(f"job_review_{job_id[:8]}.md")
+            with open(export_path, 'w') as f:
+                f.write(f"# Job Review: {job.display_name}\n\n")
+                f.write(f"**Job ID**: {job_id}\n")
+                f.write(f"**Template**: {job.template_name}\n")
+                f.write(f"**Status**: {job.status}\n")
+                f.write(f"**Created**: {job.created_at}\n")
+                if job.completed_at:
+                    f.write(f"**Completed**: {job.completed_at}\n")
+                f.write("\n---\n")
+                f.writelines(review_content)
+            
+            console.print(f"\n[green]📄 Review exported to: {export_path}[/green]")
+        
+        # Show helpful commands
+        console.print(f"\n[dim]💡 Helpful commands:[/dim]")
+        console.print(f"[dim]   python cli.py review {job_id} --export    # Export to markdown[/dim]")
+        console.print(f"[dim]   python cli.py review {job_id} -c script   # Review only script tasks[/dim]")
+        
+    except Exception as e:
+        console.print(f"[red]Error reviewing job: {e}[/red]")
         raise typer.Exit(1)
     finally:
         await close_database()

@@ -88,7 +88,7 @@ class ContentEngine:
     
     async def get_job_status(self, job_id: UUID) -> Optional[JobResponse]:
         """Get job status with tasks"""
-        job = await db_manager.get_job(job_id)
+        job = await db_manager.get_job_by_id(job_id)
         if not job:
             return None
         

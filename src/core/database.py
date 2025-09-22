@@ -143,15 +143,23 @@ class DatabaseManager:
                 job.id, job.name, job.display_name, job.template_name,
                 job.user_request, job.status, job.created_at
             )
-            return Job(**dict(row))
+            return self._row_to_job(row)
     
-    async def get_job(self, job_id: UUID) -> Optional[Job]:
+    async def get_job_by_id(self, job_id: UUID) -> Optional[Job]:
         """Get a job by ID"""
         query = "SELECT * FROM jobs WHERE id = $1"
         
         async with self.get_connection() as conn:
             row = await conn.fetchrow(query, job_id)
             return Job(**dict(row)) if row else None
+    
+    async def get_recent_jobs(self, limit: int = 10) -> List[Job]:
+        """Get recent jobs ordered by creation date"""
+        query = "SELECT * FROM jobs ORDER BY created_at DESC LIMIT $1"
+        
+        async with self.get_connection() as conn:
+            rows = await conn.fetch(query, limit)
+            return [Job(**dict(row)) for row in rows]
     
     async def get_jobs(self, status: Optional[JobStatus] = None, limit: int = 50) -> List[Job]:
         """Get jobs with optional status filter"""
@@ -209,13 +217,38 @@ class DatabaseManager:
                 WHEN 'image' THEN 2 
                 WHEN 'audio' THEN 3 
                 WHEN 'video' THEN 4 
-            END,
+                ELSE 5 
+            END, 
             sequence_order
         """
         
         async with self.get_connection() as conn:
             rows = await conn.fetch(query, job_id)
-            return [self._row_to_task(row) for row in rows]
+            tasks = []
+            for row in rows:
+                row_dict = dict(row)
+                # Handle JSON fields
+                if isinstance(row_dict.get('parameters'), str):
+                    import json
+                    row_dict['parameters'] = json.loads(row_dict['parameters'])
+                tasks.append(Task(**row_dict))
+            return tasks
+    
+    async def get_task_by_id(self, task_id: UUID) -> Optional[Task]:
+        """Get a specific task by ID"""
+        query = "SELECT * FROM tasks WHERE id = $1"
+        
+        async with self.get_connection() as conn:
+            row = await conn.fetchrow(query, task_id)
+            if not row:
+                return None
+            
+            row_dict = dict(row)
+            # Handle JSON fields
+            if isinstance(row_dict.get('parameters'), str):
+                import json
+                row_dict['parameters'] = json.loads(row_dict['parameters'])
+            return Task(**row_dict)
     
     async def get_next_pending_task(self, job_id: UUID) -> Optional[Task]:
         """Get the next pending task for a job (sequential execution)"""
