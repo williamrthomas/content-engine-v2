@@ -2,7 +2,16 @@
  * API Route: /api/jobs/:id/execute
  * POST: Trigger job execution via Python CLI
  *
- * Note: This spawns the Python CLI process to execute the job
+ * ⚠️ IMPORTANT: This endpoint requires a Python runtime and will NOT work on
+ * Vercel's default serverless environment. This is designed for local development
+ * or platforms that support Python execution (Railway, Render, Fly.io, etc.)
+ *
+ * For Vercel deployment:
+ * - This endpoint will return 500 errors due to missing Python runtime
+ * - Consider deploying the Python backend separately
+ * - Or implement a job queue system (BullMQ, Inngest, Trigger.dev)
+ * - Or run jobs manually via the Python CLI
+ *
  * For production, consider using a job queue (Bull, BullMQ, etc.)
  */
 
@@ -48,6 +57,22 @@ export default async function handler(
 
     if (job.status === 'completed') {
       return res.status(400).json({ error: 'Job is already completed' });
+    }
+
+    // Check if we're running on Vercel (serverless environment without Python)
+    const isVercel = process.env.VERCEL === '1';
+
+    if (isVercel) {
+      return res.status(501).json({
+        error: 'Job execution not supported on this platform',
+        message: 'This endpoint requires Python runtime which is not available on Vercel. Please run jobs using the Python CLI locally, or deploy the Python backend to a platform like Railway, Render, or Fly.io.',
+        job_id: id,
+        alternatives: [
+          'Run locally: python cli.py run ' + id,
+          'Deploy Python backend to Railway/Render',
+          'Implement a job queue system (BullMQ, Inngest)',
+        ]
+      });
     }
 
     // Trigger execution via CLI (async, don't wait)

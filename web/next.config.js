@@ -15,10 +15,8 @@ const nextConfig = {
       },
     ],
   },
-  env: {
-    DATABASE_URL: process.env.DATABASE_URL,
-  },
-  // Enable edge runtime for some API routes
+  // Environment variables are automatically available in API routes
+  // No need to explicitly expose them here
   experimental: {
     serverActions: true,
   },
